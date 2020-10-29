@@ -494,9 +494,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7483e738cc586eb409b9e5344ef05f34, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  etoPrefab: {fileID: 468201679275202168, guid: 75de547635bf23544a338bb533646073, type: 3}
+  etoPrefab: {fileID: -2314823266445726198, guid: 75de547635bf23544a338bb533646073, type: 3}
   etoSetTran: {fileID: 2092961935}
   maxRotateAngle: 40
+  etoList: []
+  etoSprites: []
 --- !u!4 &652342053
 Transform:
   m_ObjectHideFlags: 0
