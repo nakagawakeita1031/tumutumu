@@ -4,30 +4,26 @@ using UnityEngine;
 
 public class GameManager : MonoBehaviour
 {
-    //Headerでinspectorに表示
+
     [Header("干支のプレファブ")]
     //(古いコメント)etoPrefab変数にGameObject型の情報を代入する(GameObject型のetoPrefabオブジェクト)
     // 宣言する型を GameObject型 から Eto型に変更。EtoPrefabは前と同じようにProject内からアサインできる
     public Eto etoPrefab;　
 
-    //Headerでinspectorに表示
     [Header("干支の生成位置")]
     //etoSetTran変数に、ここにアサインされたゲームオブジェクトの持つTransform型の情報を代入する
     public Transform etoSetTran;
 
-    //Headerでinspectorに表示
     [Header("干支生成時の最大回転角度")]
     //浮動小数点型、maxRotateAngle変数に40.0を代入する
     public float maxRotateAngle = 40.0f;
 
     //SerializeField←データ構造やオブジェクトの状態を、保存・再構築できるようなフォーマットに変換する
-    //Headerでinspectorに表示
     [SerializeField, Header("生成された干支のリスト")]
     //このクラスのみ参照可
     //リスト宣言、使用するためにEto型のetoListを初期化
     private List<Eto> etoList = new List<Eto>();
 
-    //Headerでinspectorに表示
     [SerializeField, Header("干支の画像データ")]
     //Sprite型のetoSprites変数を生成
     private Sprite[] etoSprites;
@@ -41,15 +37,17 @@ public class GameManager : MonoBehaviour
     // 最初にドラッグした干支の種類(currentEtoType変数にEtoType型の情報を代入)
     private EtoType? currentEtoType;
 
-    //Headerでinspectorに表示
     [SerializeField, Header("削除対象となる干支を登録するリスト")]
     //リスト宣言、使用するためにEto型のeraseEtoList変数を初期化
     private List<Eto> eraseEtoList = new List<Eto>();
 
-    //Headerでinspectorに表示
     [SerializeField, Header("つながっている干支の数")]
     //int型linkCountに0を代入
     private int linkCount = 0;
+
+    [Header("スワイプでつながる干支の範囲")]
+    //float型etoDistance変数に1.0を代入
+    public float etoDistance = 1.0f;
 
     IEnumerator Start()
     {   // <=  戻り値を void から IEnumerator型に変更して、コルーチンメソッドにする
@@ -149,11 +147,19 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        // 干支をつなげる処理(もし0が押され、かつfirstSelectEtoが空だった場合)
+        // 干支をつなげる処理(もし0が押され、かつfirstSelectEtoがnullだった場合)
         if (Input.GetMouseButtonDown(0) && firstSelectEto == null)
         {
             // 干支を最初にドラッグした際の処理(OnStartDrag処理が行われる)
+            //OnStartDragメソッドが処理される
             OnStartDrag();
+        }
+        //nullではなかった場合、もしfirstSelectEtoがnullではない場合
+        else if (firstSelectEto != null)
+        {
+            // 干支のドラッグ（スワイプ）中の処理	    
+            //OnDraggingメソッドが処理される
+            OnDragging();
         }
     }
 
@@ -163,7 +169,7 @@ public class GameManager : MonoBehaviour
     private void OnStartDrag()
     {
         // 画面をタップした際の位置情報を、CameraクラスのScreenToWorldPointメソッドを利用してCanvas上の座標に変換
-        //Camera.main(メインカメラオブジェクト)に属するScreenToWorldPointメソッドをを使い位置情報をCanvasScene上の座標に変換し結果をhitに返す。
+        //Camera.main(メインカメラオブジェクト)に属するScreenToWorldPointメソッドをを使いオブジェクトの位置情報をCanvasScene上の座標に変換し結果をhitに返す。
         RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(Input.mousePosition), Vector2.zero);
 
         // 干支がつながっている数を初期化
@@ -209,6 +215,86 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 干支のドラッグ（スワイプ）中処理
+    /// </summary>
+    private void OnDragging()
+    {
+        // OnStartDragメソッドと同じ処理で、指の位置をワールド座標に変換しRayを発射し、その位置にあるコライダーを持つオブジェクトを取得してhit変数へ代入
+        ////Camera.main(メインカメラオブジェクト)に属するScreenToWorldPointメソッドをを使いオブジェクトの位置情報をCanvasScene上の座標に変換し結果をhitに返す。
+        RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(Input.mousePosition), Vector2.zero);
+
+        // Rayの戻り値があり(hit変数がnullではない)、hit変数のゲームオブジェクトがEtoクラスを持っていたら
+        //もし当たり判定のあるゲームオブジェクトが空ではなく、かつEtoクラスのdragEto変数を持っているか確認できた場合
+        if (hit.collider != null && hit.collider.gameObject.TryGetComponent(out Eto dragEto))
+        {
+
+            // 現在選択中の干支の種類がnullなら処理は行わない
+            //もしcurrentEtoTypeがnullの場合何も処理しない
+            if (currentEtoType == null)
+            {
+                return;
+            }
+
+            // dragEto変数の干支の種類が最初に選択した干支の種類と同じであり、最後にタップしている干支と現在の干支が違うオブジェクトであり、かつ、現在の干支がすでに「選択中」でなければ
+            //dragEto変数のetoTypeがcurrentEtoType同じでlastSelectEtoが
+            if (dragEto.etoType == currentEtoType && lastSelectEto != dragEto && !dragEto.isSelected)
+            {
+
+                // 現在タップしている干支の位置情報と最後にタップした干支の位置情報と比べて、差分の値（干支通しの距離）を取る
+                float distance = Vector2.Distance(dragEto.transform.position, lastSelectEto.transform.position);
+
+                // 干支同士の距離が設定値よりも小さければ(２つの干支が離れていなければ)、干支をつなげる
+                if (distance < etoDistance)
+                {
+
+                    // 現在の干支を選択中にする
+                    dragEto.isSelected = true;
+
+                    // 最後に選択している干支を現在の干支に更新
+                    lastSelectEto = dragEto;
+
+                    // 干支のつながった数のカウントを１つ増やす
+                    linkCount++;
+
+                    // 干支に通し番号を設定
+                    dragEto.num = linkCount;
+
+                    // 削除リストに現在の干支を追加
+                    AddEraseEtoList(dragEto);
+                }
+            }
+
+            // 現在の干支の種類を確認(現在の干支(dragEtoの情報であれば、他の情報でもよい。ちゃんと選択されているかの確認用))		
+            Debug.Log(dragEto.etoType);
+
+            // 削除リストに２つ以上の干支が追加されている場合
+            if (eraseEtoList.Count > 1)
+            {
+
+                // 現在の干支の通し番号を確認
+                Debug.Log(dragEto.num);
+
+                // 条件に合致する場合、削除リストから干支を除外する(ドラッグしたまま１つ前の干支の戻る場合、現在の干支を削除リストから除外する)
+                if (eraseEtoList[linkCount - 1] != lastSelectEto && eraseEtoList[linkCount - 1].num == dragEto.num && dragEto.isSelected)
+                {
+
+                    // 選択中のボールを取り除く 
+                    RemoveEraseEtoList(lastSelectEto);
+
+                    lastSelectEto.GetComponent<Eto>().isSelected = false;
+
+                    // 最後のボールの情報を、前のボールに戻す
+                    lastSelectEto = dragEto;
+
+                    // つながっている干支の数を減らす	
+                    linkCount--;
+                }
+            }
+        }
+    }
+
+
+    /// <summary>
     /// 選択された干支を削除リストに追加
     /// </summary>
     /// <param name="dragEto"></param>
@@ -219,6 +305,26 @@ public class GameManager : MonoBehaviour
 
         // ドラッグ中の干支のアルファ値を0.5fにする(半透明にすることで、選択中であることをユーザーに伝える)
         ChangeEtoAlpha(dragEto, 0.5f);
+    }
+
+    /// <summary>
+    /// 前の干支に戻った際に削除リストから削除
+    /// </summary>
+    /// <param name="dragEto"></param>
+    private void RemoveEraseEtoList(Eto dragEto)
+    {
+        // 削除リストから削除
+        eraseEtoList.Remove(dragEto);
+
+        // 干支の透明度を元の値(1.0f)に戻す
+        ChangeEtoAlpha(dragEto, 1.0f);
+
+        // 干支の「選択中」の情報がtrueの場合
+        if (dragEto.isSelected)
+        {
+            // falseにして選択中ではない状態に戻す
+            dragEto.isSelected = false;
+        }
     }
 
     /// <summary>
