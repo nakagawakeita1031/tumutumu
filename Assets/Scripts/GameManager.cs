@@ -20,17 +20,36 @@ public class GameManager : MonoBehaviour
     //浮動小数点型、maxRotateAngle変数に40.0を代入する
     public float maxRotateAngle = 40.0f;
 
+    //SerializeField←データ構造やオブジェクトの状態を、保存・再構築できるようなフォーマットに変換する
     //Headerでinspectorに表示
     [SerializeField, Header("生成された干支のリスト")]
     //このクラスのみ参照可
-    //リスト宣言、すでに作成したEto型のetoListに新しくリストEto型で初期化する
+    //リスト宣言、使用するためにEto型のetoListを初期化
     private List<Eto> etoList = new List<Eto>();
 
-    //データ構造やオブジェクトの状態を、保存・再構築できるようなフォーマットに変換する
     //Headerでinspectorに表示
     [SerializeField, Header("干支の画像データ")]
     //Sprite型のetoSprites変数を生成
     private Sprite[] etoSprites;
+
+    // 最初にドラッグした干支の情報(firstSelectEto変数にEto型の情報を代入)
+    private Eto firstSelectEto;
+
+    // 最後にドラッグした干支の情報(lastSelectEto変数にEto型の情報を代入)
+    private Eto lastSelectEto;
+
+    // 最初にドラッグした干支の種類(currentEtoType変数にEtoType型の情報を代入)
+    private EtoType? currentEtoType;
+
+    //Headerでinspectorに表示
+    [SerializeField, Header("削除対象となる干支を登録するリスト")]
+    //リスト宣言、使用するためにEto型のeraseEtoList変数を初期化
+    private List<Eto> eraseEtoList = new List<Eto>();
+
+    //Headerでinspectorに表示
+    [SerializeField, Header("つながっている干支の数")]
+    //int型linkCountに0を代入
+    private int linkCount = 0;
 
     IEnumerator Start()
     {   // <=  戻り値を void から IEnumerator型に変更して、コルーチンメソッドにする
@@ -50,7 +69,6 @@ public class GameManager : MonoBehaviour
     //コルーチンメソッド。干支画像読み込むまで次の処理にはいかない
     private IEnumerator LoadEtoSprites()
     {
-        Debug.Log("生成");
         // etoSprites変数に、配列(整数型のEtoTypeスクリプト内の12個の画像が入るようにSprite型の配列を12個用意する)を初期化する
         etoSprites = new Sprite[(int)EtoType.Count];
 
@@ -127,5 +145,90 @@ public class GameManager : MonoBehaviour
             // コルーチンを一時中断、0.03秒待って次の干支(クローン)を生成
             yield return new WaitForSeconds(0.03f);
         }
+    }
+
+    void Update()
+    {
+        // 干支をつなげる処理(もし0が押され、かつfirstSelectEtoが空だった場合)
+        if (Input.GetMouseButtonDown(0) && firstSelectEto == null)
+        {
+            // 干支を最初にドラッグした際の処理(OnStartDrag処理が行われる)
+            OnStartDrag();
+        }
+    }
+
+    /// <summary>
+    /// 干支を最初にドラッグした際の処理
+    /// </summary>
+    private void OnStartDrag()
+    {
+        // 画面をタップした際の位置情報を、CameraクラスのScreenToWorldPointメソッドを利用してCanvas上の座標に変換
+        //Camera.main(メインカメラオブジェクト)に属するScreenToWorldPointメソッドをを使い位置情報をCanvasScene上の座標に変換し結果をhitに返す。
+        RaycastHit2D hit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(Input.mousePosition), Vector2.zero);
+
+        // 干支がつながっている数を初期化
+        //linkCount変数に0を代入
+        linkCount = 0;
+
+        // 変換した座標のコライダーを持つゲームオブジェクトがあるか確認
+        //もしCanvas上にcolliderを持つオブジェクトがnullではないとき
+        if (hit.collider != null)
+        {
+            // ゲームオブジェクトがあった場合、そのゲームオブジェクトがEtoクラスを持っているかどうか確認
+            //もし当たり判定のあるゲームオブジェクトがEtoクラスのdragEto変数を持っているか確認できた場合
+            if (hit.collider.gameObject.TryGetComponent(out Eto dragEto))
+            {
+                // Etoクラスを持っていた場合には、以下の処理を行う
+
+                // 最初にドラッグした干支の情報を変数に代入
+                //firstSelectEto変数にdragEto(オブジェクトの情報)変数を代入
+                firstSelectEto = dragEto;
+
+                // 最後にドラッグした干支の情報を変数に代入(最初のドラッグなので、最後のドラッグも同じ干支)
+                //lastSelectEto変数にdragEto(オブジェクトの情報)変数を代入
+                lastSelectEto = dragEto;
+
+                // 最初にドラッグしている干支の種類を代入 = 後ほど、この情報を使ってつながる干支かどうかを判別する
+                //currentEtoType変数にdragEtoのetoType(オブジェクトの種類)を代入
+                currentEtoType = dragEto.etoType;
+
+                // 干支の状態が「選択中」であると更新    ←よくわからない
+                dragEto.isSelected = true;
+
+                // 干支に何番目に選択されているのか、通し番号を登録　←よくわからない
+                dragEto.num = linkCount;
+
+                // 削除する対象の干支を登録するリストを初期化　
+                //eraseEtoList変数を初期化
+                eraseEtoList = new List<Eto>();
+
+                // ドラッグ中の干支を削除の対象としてリストに登録
+                AddEraseEtoList(dragEto);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 選択された干支を削除リストに追加
+    /// </summary>
+    /// <param name="dragEto"></param>
+    private void AddEraseEtoList(Eto dragEto)
+    {
+        // 削除リストにドラッグ中の干支を追加
+        eraseEtoList.Add(dragEto);
+
+        // ドラッグ中の干支のアルファ値を0.5fにする(半透明にすることで、選択中であることをユーザーに伝える)
+        ChangeEtoAlpha(dragEto, 0.5f);
+    }
+
+    /// <summary>
+    /// 干支のアルファ値を変更
+    /// </summary>
+    /// <param name="dragEto"></param>
+    /// <param name="alphaValue"></param>
+    private void ChangeEtoAlpha(Eto dragEto, float alphaValue)
+    {
+        // 現在ドラッグしている干支のアルファ値を変更
+        dragEto.imgEto.color = new Color(dragEto.imgEto.color.r, dragEto.imgEto.color.g, dragEto.imgEto.color.b, alphaValue);
     }
 }
