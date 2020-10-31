@@ -147,12 +147,19 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        // 干支をつなげる処理(もし0が押され、かつfirstSelectEtoがnullだった場合)
+        // 干支をつなげる処理(もし左クリックが押され、かつfirstSelectEtoがnullだった場合)
         if (Input.GetMouseButtonDown(0) && firstSelectEto == null)
         {
             // 干支を最初にドラッグした際の処理(OnStartDrag処理が行われる)
             //OnStartDragメソッドが処理される
             OnStartDrag();
+        }
+        //nullではなく、もし左クリックを離した場合
+        else if (Input.GetMouseButtonUp(0))
+        {
+            // 干支のドラッグをやめた（指を離した）際の処理
+            //OnEndDragめっそっどが処理させる
+            OnEndDrag();
         }
         //nullではなかった場合、もしfirstSelectEtoがnullではない場合
         else if (firstSelectEto != null)
@@ -293,6 +300,58 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 干支のドラッグをやめた（指を画面から離した）際の処理
+    /// </summary>
+    private void OnEndDrag()
+    {
+
+        // つながっている干支が３つ以上あったら削除する処理にうつる
+        //もし干支が3以上ある場合
+        if (eraseEtoList.Count >= 3)
+        {
+
+            // 選択されている干支を消す
+            //iが干支の数より少なければ足し続ける
+            for (int i = 0; i < eraseEtoList.Count; i++)
+            {
+                // 干支リストから取り除く
+                //干支リストからその数を取り除く
+                etoList.Remove(eraseEtoList[i]);
+
+                // 干支を削除
+                //干支リストの数のゲームオブジェクトを破棄する
+                Destroy(eraseEtoList[i].gameObject);
+            }
+
+            // 消した干支の数だけ新しい干支をランダムに生成
+            StartCoroutine(CreateEtos(eraseEtoList.Count));
+
+            // 削除リストをクリアする
+            eraseEtoList.Clear();
+        }
+        //干支の数が２つ以下なら
+        else
+        {
+            // つながっている干支が２つ以下なら、削除はしない
+
+            // 削除リストから、削除候補であった干支を取り除く		
+            for (int i = 0; i < eraseEtoList.Count; i++)
+            {
+
+                // 各干支の選択中の状態を解除する
+                eraseEtoList[i].isSelected = false;
+
+                // 干支の色の透明度を元の透明度に戻す
+                ChangeEtoAlpha(eraseEtoList[i], 1.0f);
+            }
+        }
+
+        // 次回の干支を消す処理のために、各変数の値をnullにする	
+        firstSelectEto = null;
+        lastSelectEto = null;
+        currentEtoType = null;
+    }
 
     /// <summary>
     /// 選択された干支を削除リストに追加
