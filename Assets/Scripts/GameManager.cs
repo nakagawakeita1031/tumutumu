@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using DG.Tweening;
 
 public class GameManager : MonoBehaviour
 {
@@ -49,16 +50,48 @@ public class GameManager : MonoBehaviour
     //float型etoDistance変数に1.0を代入
     public float etoDistance = 1.0f;
 
+    [SerializeField]
+    //UIManager型のuiManager変数
+    private UIManager uiManager;
+
+    private float timer;        // 残り時間計測用
+
+    /// <summary>
+    /// ゲームの進行状況
+    /// </summary>
+    public enum GameState
+    {
+        Select,     // 干支の選択中
+        Ready,      // ゲームの準備中
+        Play,       // ゲームのプレイ中
+        Result      // リザルト中
+    }
+
+    [Header("現在のゲームの進行状況")]
+    //GameState型のgameState変数にGameStateクラスのSelect変数を代入
+    public GameState gameState = GameState.Select;
+
+    [SerializeField]
+    //ResultPopUp型のresultPopUp変数
+    private ResultPopUp resultPopUp;
+
+
     IEnumerator Start()
     {   // <=  戻り値を void から IEnumerator型に変更して、コルーチンメソッドにする
         // 干支の画像を読みこむ。この処理が終了するまで、次の処理へはいかないようにする
         yield return StartCoroutine(LoadEtoSprites());
+
+        // 残り時間の表示
+        uiManager.UpdateDisplayGameTime(GameData.instance.gameTime);
 
         //コルーチンとは実行を停止して Unity へ制御を戻し、ただし続行するときは
         //停止したところから次のフレームで実行を継続することができる関数
         //フレームを跨いで処理を中断・再開させることが出来る仕組み
         //コルーチンを実行、GameData型のinstance変数のcreateEtoCountを参照
         StartCoroutine(CreateEtos(GameData.instance.createEtoCount));
+
+        // gameStateを準備中に変更
+        gameState = GameState.Ready;
     }
 
     /// <summary>
@@ -143,10 +176,22 @@ public class GameManager : MonoBehaviour
             // コルーチンを一時中断、0.03秒待って次の干支(クローン)を生成
             yield return new WaitForSeconds(0.03f);
         }
+
+        // gameStateが準備中のときだけゲームプレイ中に変更
+        if (gameState == GameState.Ready)
+        {
+            gameState = GameState.Play;
+        }
     }
 
     void Update()
     {
+        // ゲームのプレイ中以外のgameStateでは処理を行わない
+        if (gameState != GameState.Play)
+        {
+            return;
+        }
+
         // 干支をつなげる処理(もし左クリックが押され、かつfirstSelectEtoがnullだった場合)
         if (Input.GetMouseButtonDown(0) && firstSelectEto == null)
         {
@@ -168,6 +213,33 @@ public class GameManager : MonoBehaviour
             //OnDraggingメソッドが処理される
             OnDragging();
         }
+
+        // ゲームの残り時間のカウント処理
+        timer += Time.deltaTime;
+
+        // timerが 1 以上になったら
+        if (timer >= 1)
+        {
+            // リセットして再度加算できるように
+            timer = 0;
+
+            // 残り時間をマイナス 
+            GameData.instance.gameTime--;
+
+            // 残り時間がマイナスになったら
+            if (GameData.instance.gameTime <= 0)
+            {
+
+                //0で止める
+                GameData.instance.gameTime = 0;
+
+                // TODO ゲーム終了を追加する
+                StartCoroutine(GameUp());
+            }
+
+            // 残り時間の表示更新
+            uiManager.UpdateDisplayGameTime(GameData.instance.gameTime);
+        }
     }
 
     /// <summary>
@@ -188,7 +260,11 @@ public class GameManager : MonoBehaviour
         if (hit.collider != null)
         {
             // ゲームオブジェクトがあった場合、そのゲームオブジェクトがEtoクラスを持っているかどうか確認
-            //もし当たり判定のあるゲームオブジェクトがEtoクラスのdragEto変数を持っているか確認できた場合
+            //もし当たり判定のあるゲームオブジェクトがEtoクラスを持っている場合dragEto変数に代入された場合
+            //やりたいことが３つある
+            //Etoクラスを持っているか確認
+            //Etoクラスを持っていたらEtoクラスに代入
+            //Etoクラスを持っていたらtrueを返す
             if (hit.collider.gameObject.TryGetComponent(out Eto dragEto))
             {
                 // Etoクラスを持っていた場合には、以下の処理を行う
@@ -205,10 +281,10 @@ public class GameManager : MonoBehaviour
                 //currentEtoType変数にdragEtoのetoType(オブジェクトの種類)を代入
                 currentEtoType = dragEto.etoType;
 
-                // 干支の状態が「選択中」であると更新    ←よくわからない
+                // 干支の状態が「選択中」であると更新   
                 dragEto.isSelected = true;
 
-                // 干支に何番目に選択されているのか、通し番号を登録　←よくわからない
+                // 干支に何番目に選択されているのか、通し番号を登録　
                 dragEto.num = linkCount;
 
                 // 削除する対象の干支を登録するリストを初期化　
@@ -324,6 +400,11 @@ public class GameManager : MonoBehaviour
                 Destroy(eraseEtoList[i].gameObject);
             }
 
+            // スコアと消した干支の数の加算
+            //AddScoresメソッド
+            AddScores(currentEtoType, eraseEtoList.Count);
+
+
             // 消した干支の数だけ新しい干支をランダムに生成
             StartCoroutine(CreateEtos(eraseEtoList.Count));
 
@@ -396,4 +477,61 @@ public class GameManager : MonoBehaviour
         // 現在ドラッグしている干支のアルファ値を変更
         dragEto.imgEto.color = new Color(dragEto.imgEto.color.r, dragEto.imgEto.color.g, dragEto.imgEto.color.b, alphaValue);
     }
+
+    /// <summary>
+    /// スコアと消した干支の数を加算
+    /// </summary>
+    /// <param name="etoType">消した干支の種類</param>
+    /// <param name="count">消した干支の数</param>
+    //
+    private void AddScores(EtoType? etoType, int count)
+    {
+        // スコアを加算(EtoPoint * 消した数)
+        //GameDataクラスのinstance.score変数にetoPoint * countの合計を代入
+        GameData.instance.score += GameData.instance.etoPoint * count;
+
+        // 消した干支の数を加算
+        //eraceEtoCountにcountを加算する
+        GameData.instance.eraseEtoCount += count;
+
+        // スコア加算と画面の更新処理
+        uiManager.UpdateDisplayScore();
+    }
+
+    /// ゲーム終了処理
+    /// </summary>
+    private IEnumerator GameUp()
+    {
+
+        // gameStateをリザルトに変更する = Updateメソッドが動かなくなる
+        gameState = GameState.Result;
+
+        yield return new WaitForSeconds(1.5f);
+
+        // TODO リザルトの処理を実装する
+        yield return StartCoroutine(MoveResultPopUp());
+    }
+
+    /// <summary>
+    /// リザルドポップアップを画面内に移動
+    /// </summary>
+    /// <returns></returns> 
+    private IEnumerator MoveResultPopUp()
+    {
+
+        // DoTweenの機能を使って、ResultPopUpゲームオブジェクトを画面外から画面内に移動させる
+        //resultPopUpの位置情報を0に1.0秒かけてEase.Linearアニメーション形式で移動させる
+        resultPopUp.transform.DOMoveY(0, 1.0f).SetEase(Ease.Linear)
+                .OnComplete(() => {
+                    // TODO 移動完了後に、リザルト内容を表示
+                    // リザルト表示(スコアと消した干支の数を渡す)　TODOを実装します
+                    resultPopUp.DisplayResult(GameData.instance.score, GameData.instance.eraseEtoCount);
+
+                }
+    );
+
+        yield return new WaitForSeconds(1.0f);
+    }
+
+
 }

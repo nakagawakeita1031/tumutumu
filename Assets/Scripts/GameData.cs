@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class GameData : MonoBehaviour
 {
@@ -21,6 +22,26 @@ public class GameData : MonoBehaviour
 
     //整数型、createEtoCountに50を代入する
     public int createEtoCount = 50;
+
+    [Header("現在のスコア")]
+    //int型score変数に0を代入
+    public int score = 0;
+
+    [Header("干支を消した際に加算されるスコア")]
+    //int型etoPoint変数に100を代入
+    public int etoPoint = 100;
+
+    [Header("消した干支の数")]
+    //int型eraseEtoCount変数に0を代入
+    public int eraseEtoCount = 0;
+
+    [SerializeField, Header("1回辺りのゲーム時間")]
+    //int型initTime変数に60を代入
+    private int initTime = 60;
+
+    [Header("現在のゲームの残り時間")]
+    //float型gameTime変数
+    public float gameTime;
 
     void Awake()//Startメソッドよりも最初に実行される。
     {
@@ -45,6 +66,41 @@ public class GameData : MonoBehaviour
 
             //gameObjectを破棄する => GameData クラスを持つゲームオブジェクトを破棄
             Destroy(gameObject);
+
+            // ゲームの初期化
+            InitGame();
         }
     }
+    /// <summary>
+    /// ゲーム初期化
+    /// </summary>
+    private void InitGame()
+    {
+        //score変数に0を代入
+        //eraseEtoCountに0を代入
+        //"Init Game"をログに表示
+        score = 0;
+        eraseEtoCount = 0;
+
+        // ゲーム時間を設定
+        //gameTime変数にinitTimeを代入
+        gameTime = initTime;
+        Debug.Log("Init Game");
+    }
+
+    /// <summary>
+    /// 現在のゲームシーンを再読み込み
+    /// </summary>
+    /// <returns></returns>
+    public IEnumerator RestartGame()
+    {
+        yield return new WaitForSeconds(1.0f);
+
+        // 現在のゲームシーンを取得し、シーンの名前を使ってLoadScene処理を行う(再度、同じゲームシーンを呼び出す)
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+
+        // 初期化 GameDataゲームオブジェクトはシーン遷移しても破棄されない設定になっていますので、ここで再度、初期化の処理を行う必要があります。
+        InitGame();
+    }
 }
+
