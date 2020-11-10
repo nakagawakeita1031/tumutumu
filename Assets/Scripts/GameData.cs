@@ -67,9 +67,9 @@ public class GameData : MonoBehaviour
             //gameObjectを破棄する => GameData クラスを持つゲームオブジェクトを破棄
             Destroy(gameObject);
 
-            // ゲームの初期化
-            InitGame();
         }
+        // ゲームの初期化
+        InitGame();
     }
     /// <summary>
     /// ゲーム初期化
